@@ -1,16 +1,25 @@
-# hello_flutter
+# 🏥 Hospital Booking App
 
-A new Flutter project.
+A Flutter-based mobile application for patients to manage hospital services — designed for educational use at UMK.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## ✨ Key Features
 
-A few resources to get you started if this is your first Flutter project:
+- 📅 Book doctor appointments
+- 💊 Order medications (pickup or courier)
+- 🌗 Dark mode toggle
+- 🌍 Language toggle: English ↔ Bahasa Melayu
+- 🔔 Local notifications for reminders
+- 📝 Feedback submission
+- 👤 Patient profile management
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 📸 Screenshots
+
+> *(Add screenshots later in `screenshots/` and reference them like this)*
+
+```md
+![Login Page](screenshots/login.png)
+![Medication Order](screenshots/order.png)
