@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'user_session.dart';
+import 'package:uuid/uuid.dart';
+
+import 'database_helper.dart';
+import 'medication_order.dart';
+import 'notification_service.dart'; // ✅ Notification logic
 
 class OrderMedicationPage extends StatefulWidget {
   final Map<String, dynamic> userProfile;
-
   const OrderMedicationPage({super.key, required this.userProfile});
 
   @override
@@ -11,99 +14,206 @@ class OrderMedicationPage extends StatefulWidget {
 }
 
 class _OrderMedicationPageState extends State<OrderMedicationPage> {
-  String? selectedMedicine;
-  String? pickupTime;
-  String? selectedDate;
+  final List<String> _medications = ['Paracetamol', 'Cough Syrup', 'Antibiotic'];
+  final Map<String, Map<String, String>> _medicationDetails = {
+    'Paracetamol': {
+      'mg': '500mg',
+      'adult': '1 tablet every 6 hours',
+      'child': 'Half tablet every 6 hours',
+    },
+    'Cough Syrup': {
+      'mg': '5ml',
+      'adult': '10ml every 8 hours',
+      'child': '5ml every 8 hours',
+    },
+    'Antibiotic': {
+      'mg': '250mg',
+      'adult': '1 capsule every 8 hours',
+      'child': 'Ask doctor',
+    },
+  };
 
-  final List<String> availableMedicines = [
-    "Paracetamol 500mg - Adult: 1 tab, Child: ½ tab",
-    "Amoxicillin 250mg - Adult: 1 cap, Child: ½ cap",
-    "Cetirizine 10mg - Adult: 1 tab, Child: ½ tab",
-  ];
+  final List<String> _pickupLocations = ['Pharmacy Counter A', 'Pharmacy Counter B', 'Drive-Thru A'];
+  String? _selectedMedication;
+  int _quantity = 1;
+  bool _isChild = false;
+  String _deliveryMethod = 'Pickup';
+  final TextEditingController _addressController = TextEditingController();
+  String _pickupLocation = 'Pharmacy Counter A';
+  DateTime? _pickupDate;
+  TimeOfDay? _pickupTime;
 
-  final List<String> pickupSlots = [
-    "9:00 AM", "11:00 AM", "2:00 PM", "4:00 PM"
-  ];
-
-  void _submitOrder() {
-    if (selectedMedicine == null || pickupTime == null || selectedDate == null) {
+  Future<void> _submitOrder() async {
+    if (_selectedMedication == null || _quantity < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select all details')),
+        const SnackBar(content: Text('Please select medication and quantity')),
       );
       return;
     }
 
-    final orderSummary =
-        "Order placed for: $selectedMedicine\nPickup Date: $selectedDate\nTime: $pickupTime";
+    if (_deliveryMethod == 'Courier' && _addressController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a delivery address')),
+      );
+      return;
+    }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(orderSummary)),
-    );
-  }
+    if (_pickupDate == null || _pickupTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select pickup date and time')),
+      );
+      return;
+    }
 
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+    final pickupDateTime = DateTime(
+      _pickupDate!.year,
+      _pickupDate!.month,
+      _pickupDate!.day,
+      _pickupTime!.hour,
+      _pickupTime!.minute,
     );
-    if (picked != null) {
-      setState(() {
-        selectedDate =
-            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
-      });
+
+    final order = MedicationOrder(
+      id: const Uuid().v4(),
+      patientName: widget.userProfile['name'],
+      patientEmail: widget.userProfile['email'],
+      medications: [_selectedMedication!],
+      quantity: _quantity,
+      isChild: _isChild,
+      deliveryMethod: _deliveryMethod,
+      address: _deliveryMethod == 'Courier' ? _addressController.text.trim() : '',
+      pickupLocation: _pickupLocation,
+      pickupDateTime: pickupDateTime,
+      status: OrderStatus.pending,
+    );
+
+    await DatabaseHelper().insertMedicationOrder(order.toMap());
+
+    // ✅ Schedule pickup reminder
+    await NotificationService.scheduleNotification(
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: 'Medication Pickup Reminder',
+      body: 'Pick up your medication: $_selectedMedication at $_pickupLocation',
+      dateTime: pickupDateTime.subtract(const Duration(hours: 1)),
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order placed successfully')),
+      );
+      Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final selectedDetails = _selectedMedication != null ? _medicationDetails[_selectedMedication!] : null;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Order Medication")),
+      appBar: AppBar(title: const Text('Order Medication')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
           children: [
+            SwitchListTile(
+              title: const Text('Is this for a child?'),
+              value: _isChild,
+              onChanged: (val) => setState(() => _isChild = val),
+            ),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: "Select Medicine",
-                border: OutlineInputBorder(),
-              ),
-              items: availableMedicines.map((medicine) {
-                return DropdownMenuItem(
-                  value: medicine,
-                  child: Text(medicine),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => selectedMedicine = value),
+              value: _selectedMedication,
+              items: _medications
+                  .map((med) => DropdownMenuItem(value: med, child: Text(med)))
+                  .toList(),
+              decoration: const InputDecoration(labelText: 'Select Medication'),
+              onChanged: (val) => setState(() => _selectedMedication = val),
+            ),
+            if (selectedDetails != null) ...[
+              const SizedBox(height: 12),
+              Text('Dosage: ${selectedDetails[_isChild ? 'child' : 'adult']}'),
+              Text('Strength: ${selectedDetails['mg']}'),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text('Quantity:'),
+                const SizedBox(width: 10),
+                DropdownButton<int>(
+                  value: _quantity,
+                  items: List.generate(10, (i) => i + 1)
+                      .map((num) => DropdownMenuItem(value: num, child: Text('$num')))
+                      .toList(),
+                  onChanged: (val) => setState(() => _quantity = val!),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
-            ListTile(
-              title: Text(selectedDate == null
-                  ? "Select Pickup Date"
-                  : "Pickup Date: $selectedDate"),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _selectDate,
-            ),
-            const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: "Select Pickup Time",
-                border: OutlineInputBorder(),
-              ),
-              items: pickupSlots.map((slot) {
-                return DropdownMenuItem(
-                  value: slot,
-                  child: Text(slot),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => pickupTime = value),
+              value: _deliveryMethod,
+              decoration: const InputDecoration(labelText: 'Delivery Method'),
+              items: const [
+                DropdownMenuItem(value: 'Pickup', child: Text('Pickup at Hospital')),
+                DropdownMenuItem(value: 'Courier', child: Text('Courier Delivery')),
+              ],
+              onChanged: (val) => setState(() => _deliveryMethod = val!),
             ),
-            const SizedBox(height: 20),
+            if (_deliveryMethod == 'Courier') ...[
+              TextFormField(
+                controller: _addressController,
+                decoration: const InputDecoration(labelText: 'Delivery Address'),
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _pickupLocation,
+                decoration: const InputDecoration(labelText: 'Pickup Location'),
+                items: _pickupLocations.map((loc) {
+                  return DropdownMenuItem(value: loc, child: Text(loc));
+                }).toList(),
+                onChanged: (val) => setState(() => _pickupLocation = val!),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                title: Text(
+                  _pickupDate == null
+                      ? 'Select Pickup Date'
+                      : '${_pickupDate!.year}-${_pickupDate!.month.toString().padLeft(2, '0')}-${_pickupDate!.day.toString().padLeft(2, '0')}',
+                ),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setState(() => _pickupDate = picked);
+                  }
+                },
+              ),
+              ListTile(
+                title: Text(
+                  _pickupTime == null
+                      ? 'Select Pickup Time'
+                      : _pickupTime!.format(context),
+                ),
+                trailing: const Icon(Icons.access_time),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.now(),
+                  );
+                  if (picked != null) {
+                    setState(() => _pickupTime = picked);
+                  }
+                },
+              ),
+            ],
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _submitOrder,
-              child: const Text("Confirm Order"),
+              child: const Text('Submit Order'),
             )
           ],
         ),

@@ -1,98 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'feedback_data.dart';
-import 'user_session.dart';
+import 'database_helper.dart';
 
-class FeedbackScreen extends StatefulWidget {
-  const FeedbackScreen({super.key});
-
-  @override
-  State<FeedbackScreen> createState() => _FeedbackScreenState();
-}
-
-class _FeedbackScreenState extends State<FeedbackScreen> {
-  final TextEditingController _feedbackController = TextEditingController();
-  double _rating = 3.0;
-  bool _isEdit = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final existing = FeedbackData.getByName(UserSession.username);
-    if (existing != null) {
-      _feedbackController.text = existing.comment;
-      _rating = existing.rating;
-      _isEdit = true;
-    }
-  }
-
-  void _submitFeedback() {
-    if (_feedbackController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your feedback')),
-      );
-      return;
-    }
-
-    FeedbackData.addOrUpdate(
-      UserSession.username,
-      _rating,
-      _feedbackController.text.trim(),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Feedback ${_isEdit ? "updated" : "submitted"} successfully'),
-      ),
-    );
-
-    Navigator.pop(context);
-  }
-
-  @override
-  void dispose() {
-    _feedbackController.dispose();
-    super.dispose();
-  }
+class FeedbackPage extends StatelessWidget {
+  final Map<String, dynamic> userProfile;
+  const FeedbackPage({super.key, required this.userProfile});
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController _commentController = TextEditingController();
+    double _rating = 0;
+
     return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? "Edit Feedback" : "Submit Feedback")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Logged in as: ${UserSession.username}",
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            const Text("Rate your experience:"),
-            RatingBar.builder(
-              initialRating: _rating,
-              minRating: 1,
-              direction: Axis.horizontal,
-              allowHalfRating: true,
-              itemCount: 5,
-              itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-              itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
-              onRatingUpdate: (rating) => setState(() => _rating = rating),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _feedbackController,
-              decoration: const InputDecoration(
-                labelText: "Your feedback",
-                border: OutlineInputBorder(),
+      appBar: AppBar(title: const Text('Submit Feedback')),
+      body: StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: ListView(
+            children: [
+              const Text('Rate your experience:', style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 10),
+              RatingBar.builder(
+                initialRating: 0,
+                minRating: 1,
+                direction: Axis.horizontal,
+                allowHalfRating: false,
+                itemCount: 5,
+                itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+                onRatingUpdate: (rating) => setState(() => _rating = rating),
               ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _submitFeedback,
-              child: Text(_isEdit ? "Update Feedback" : "Submit"),
-            ),
-          ],
+              const SizedBox(height: 24),
+              const Text('Comments:', style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _commentController,
+                decoration: const InputDecoration(
+                  hintText: 'Enter your comments here...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 4,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.send),
+                label: const Text('Submit Feedback'),
+                onPressed: () async {
+                  if (_rating == 0 || _commentController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please provide both rating and comment')),
+                    );
+                    return;
+                  }
+
+                  final feedback = {
+                    'email': userProfile['email'],
+                    'rating': _rating.round(),
+                    'comment': _commentController.text.trim(),
+                  };
+
+                  await DatabaseHelper().insertFeedback(feedback);
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Feedback submitted successfully!')),
+                    );
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,0 +1,11 @@
+{
+  "@@locale": "en",
+  "appTitle": "Hospital Booking App",
+  "login": "Login",
+  "register": "Register",
+  "language": "Language",
+  "darkMode": "Dark Mode",
+  "email": "Email",
+  "password": "Password",
+  "logout": "Logout"
+}

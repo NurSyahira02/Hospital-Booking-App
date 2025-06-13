@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hello_flutter/main.dart'; 
+import 'package:hello_flutter/login_screen.dart'; // Adjust if needed
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const HospitalApp());
+  testWidgets('Login screen has email, password, and login button', (WidgetTester tester) async {
+    // Load the LoginPage widget
+    await tester.pumpWidget(const MaterialApp(home: LoginPage()));
 
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Check that there are two text form fields
+    expect(find.byType(TextFormField), findsNWidgets(2));
 
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Check that there's a login button with the text "Login"
+    expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
   });
 }

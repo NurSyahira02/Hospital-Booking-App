@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'database_helper.dart';
+import 'notification_service.dart'; // ✅ Make sure this file exists
 
 class BookAppointmentPage extends StatefulWidget {
   final Map<String, dynamic> userProfile;
-
   const BookAppointmentPage({super.key, required this.userProfile});
 
   @override
@@ -11,68 +11,49 @@ class BookAppointmentPage extends StatefulWidget {
 }
 
 class _BookAppointmentPageState extends State<BookAppointmentPage> {
-  DateTime? selectedDate;
-  TimeOfDay? selectedTime;
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
+  final List<String> _doctors = ['Dr. John', 'Dr. Smith', 'Dr. Emma'];
+  String? _selectedDoctor;
+  final TextEditingController _reasonController = TextEditingController();
 
-  final _formKey = GlobalKey<FormState>();
-
-  void _submitAppointment() async {
-    if (_formKey.currentState!.validate() &&
-        selectedDate != null &&
-        selectedTime != null) {
+  Future<void> _bookAppointment() async {
+    if (_selectedDate != null && _selectedTime != null && _selectedDoctor != null) {
       final appointmentDateTime = DateTime(
-        selectedDate!.year,
-        selectedDate!.month,
-        selectedDate!.day,
-        selectedTime!.hour,
-        selectedTime!.minute,
+        _selectedDate!.year,
+        _selectedDate!.month,
+        _selectedDate!.day,
+        _selectedTime!.hour,
+        _selectedTime!.minute,
       );
 
-      final db = DatabaseHelper();
-      await db.insertAppointment(
-        DateTime.now().millisecondsSinceEpoch.toString(),
-        widget.userProfile['name'],
-        appointmentDateTime,
+      final appointmentData = {
+        'patient_email': widget.userProfile['email'],
+        'doctor': _selectedDoctor,
+        'dateTime': appointmentDateTime.toIso8601String(),
+        'reason': _reasonController.text.trim(),
+      };
+
+      await DatabaseHelper().insertAppointment(appointmentData);
+
+      // ✅ Schedule Notification
+      await NotificationService.scheduleNotification(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: 'Appointment Reminder',
+        body: 'You have an appointment with $_selectedDoctor',
+        dateTime: appointmentDateTime.subtract(const Duration(hours: 1)),
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Appointment booked on $appointmentDateTime')),
-      );
-
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Appointment booked')),
+        );
+        Navigator.pop(context);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date and time')),
+        const SnackBar(content: Text('Please complete all fields')),
       );
-    }
-  }
-
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-    );
-
-    if (date != null) {
-      setState(() {
-        selectedDate = date;
-      });
-    }
-  }
-
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-
-    if (time != null) {
-      setState(() {
-        selectedTime = time;
-      });
     }
   }
 
@@ -81,47 +62,68 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Book Appointment')),
       body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              Text(
-                'Book appointment for ${widget.userProfile['name'] ?? 'User'}',
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            DropdownButtonFormField<String>(
+              value: _selectedDoctor,
+              decoration: const InputDecoration(labelText: 'Select Doctor'),
+              items: _doctors.map((doctor) {
+                return DropdownMenuItem(
+                  value: doctor,
+                  child: Text(doctor),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _selectedDoctor = value),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              title: Text(_selectedDate == null
+                  ? 'Select Date'
+                  : '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  setState(() => _selectedDate = picked);
+                }
+              },
+            ),
+            ListTile(
+              title: Text(_selectedTime == null
+                  ? 'Select Time'
+                  : _selectedTime!.format(context)),
+              trailing: const Icon(Icons.access_time),
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay.now(),
+                );
+                if (picked != null) {
+                  setState(() => _selectedTime = picked);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason for Appointment',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _pickDate,
-                      child: Text(
-                        selectedDate == null
-                            ? 'Select Date'
-                            : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _pickTime,
-                      child: Text(
-                        selectedTime == null
-                            ? 'Select Time'
-                            : selectedTime!.format(context),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _submitAppointment,
-                child: const Text('Confirm Appointment'),
-              ),
-            ],
-          ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _bookAppointment,
+              child: const Text('Book Appointment'),
+            ),
+          ],
         ),
       ),
     );

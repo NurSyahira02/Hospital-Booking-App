@@ -1,70 +1,50 @@
 import 'package:flutter/material.dart';
-import 'user_session.dart';
-import 'user_database.dart';
 import 'home_page.dart';
+import 'registration_page.dart';
+import 'user_database.dart'; // ✅ use this instead of DatabaseHelper
 
-class LoginScreen extends StatefulWidget {
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  String _error = '';
-  bool _loading = false;
+class _LoginPageState extends State<LoginPage> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
 
   void _login() async {
-  setState(() {
-    _error = '';
-    _loading = true;
-  });
+    if (_formKey.currentState!.validate()) {
+      final email = emailController.text.trim();
+      final password = passwordController.text;
 
-  String email = _emailController.text.trim();
-  String password = _passwordController.text.trim();
+      try {
+        final user = await UserDatabase().authenticate(email, password);
 
-  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w]{2,4}$');
-  if (!emailRegex.hasMatch(email)) {
-    setState(() {
-      _error = 'Enter a valid email address';
-      _loading = false;
-    });
-    return;
-  }
-
-  final db = UserDatabase();
-  final user = await db.authenticate(email, password);
-
-  if (user != null) {
-    UserSession.username = user['name'];
-    UserSession.role = 'patient';
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => HomePage(userProfile: {
-          'name': user['name'],
-          'phone': user['phone'],
-          'email': user['email'],
-          'age': '',
-          'gender': '',
-          'address': '',
-        }),
-      ),
-    );
-  } else {
-    setState(() {
-      _error = 'Invalid email or password';
-      _loading = false;
-    });
-  }
-}
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+        if (user != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Login successful!')),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomePage(userProfile: user),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invalid email or password')),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login error: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   @override
@@ -72,40 +52,59 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loading ? null : _login,
-              child: _loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Login'),
-            ),
-            if (_error.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(_error, style: const TextStyle(color: Colors.red)),
+        padding: const EdgeInsets.all(20.0),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const SizedBox(height: 30),
+              const Text(
+                'Hospital Booking App',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/register');
-              },
-              child: const Text("Don't have an account? Register here"),
-            ),
-          ],
+              const SizedBox(height: 30),
+              TextFormField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Enter email' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                ),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? 'Enter password' : null,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _login,
+                child: const Text('Login'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const RegistrationPage()),
+                  );
+                },
+                child: const Text("Don't have an account? Register here"),
+              ),
+            ],
+          ),
         ),
       ),
     );

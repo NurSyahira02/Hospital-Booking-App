@@ -1,31 +1,47 @@
 class FeedbackData {
-  final String name;
-  final double rating;
+  final String email;
+  final int rating;
   final String comment;
 
-  FeedbackData(this.name, this.rating, this.comment);
+  FeedbackData({
+    required this.email,
+    required this.rating,
+    required this.comment,
+  });
 
-  static final List<FeedbackData> _feedbackList = [];
-
-  static void addOrUpdate(String name, double rating, String comment) {
-    final index = _feedbackList.indexWhere((f) => f.name == name);
-    if (index != -1) {
-      _feedbackList[index] = FeedbackData(name, rating, comment);
-    } else {
-      _feedbackList.add(FeedbackData(name, rating, comment));
-    }
+  /// Create a FeedbackData object from a map (e.g. from database)
+  factory FeedbackData.fromMap(Map<String, dynamic> map) {
+    return FeedbackData(
+      email: map['email'],
+      rating: map['rating'],
+      comment: map['comment'],
+    );
   }
 
-  static FeedbackData? getByName(String name) {
-    try {
-      return _feedbackList.firstWhere((f) => f.name == name);
-    } catch (e) {
-      return null;
-    }
+  /// Convert FeedbackData object to a map (e.g. for saving to database)
+  Map<String, dynamic> toMap() {
+    return {
+      'email': email,
+      'rating': rating,
+      'comment': comment,
+    };
   }
 
-  static List<FeedbackData> getAll() {
-    return _feedbackList;
+  /// Mock method: returns sample feedback data
+  static Future<List<FeedbackData>> getAll() async {
+    return [
+      FeedbackData(email: 'patient1@example.com', rating: 5, comment: 'Excellent care and attention.'),
+      FeedbackData(email: 'patient2@example.com', rating: 4, comment: 'Smooth appointment process.'),
+      FeedbackData(email: 'patient3@example.com', rating: 3, comment: 'Average waiting time.'),
+    ];
+  }
+
+  /// Mock search: filter feedback by email or comment keyword
+  static Future<List<FeedbackData>> getByName(String query) async {
+    final all = await getAll();
+    return all.where((f) =>
+      f.email.toLowerCase().contains(query.toLowerCase()) ||
+      f.comment.toLowerCase().contains(query.toLowerCase())
+    ).toList();
   }
 }
-

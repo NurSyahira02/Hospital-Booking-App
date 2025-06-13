@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'book_appointment_page.dart';
-import 'order_medication_page.dart';
+import 'appointment_history.dart';
 import 'feedback_screen.dart';
-import 'feedback_history.dart';
+import 'order_medication_page.dart';
 import 'profile_page.dart';
-import 'order.dart';
-import 'user_session.dart';
+import 'database_helper.dart';
 
 class HomePage extends StatefulWidget {
   final Map<String, dynamic> userProfile;
-
   const HomePage({super.key, required this.userProfile});
 
   @override
@@ -17,85 +15,135 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0;
-  late List<Widget> _pages;
+  List<Map<String, dynamic>> _appointments = [];
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  Future<void> _loadAppointments() async {
+    final email = widget.userProfile['email'] ?? '';
+    print('📩 Loading appointments for: $email');
 
-    _pages = [
-      _buildDashboard(),
-      BookAppointmentPage(userProfile: widget.userProfile),
-      OrderMedicationPage(userProfile: widget.userProfile),
-      const FeedbackScreen(),
-      ProfilePage(userProfile: widget.userProfile),
-    ];
+    final db = DatabaseHelper();
+    final results = await db.getAppointmentsForPatient(email);
+    setState(() => _appointments = results);
   }
 
-  Widget _buildDashboard() {
-    final appointment = widget.userProfile['appointmentDateTime'];
-    final userName = widget.userProfile['name'] ?? 'User';
+  @override
+  void initState() {
+    super.initState();
+    print('🏠 HomePage loaded with userProfile: ${widget.userProfile}');
+    _loadAppointments();
+  }
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: ListView(
-        children: [
-          Text(
-            'WELCOME, $userName!',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 16),
-          Card(
-            color: Colors.teal[50],
-            child: const ListTile(
-              leading: Icon(Icons.health_and_safety, color: Colors.teal),
-              title: Text('💡 Tip: Stay hydrated and follow your medication schedule.'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (appointment != null)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.calendar_month, color: Colors.indigo),
-                title: const Text("Upcoming Appointment"),
-                subtitle: Text('$appointment'),
-              ),
-            ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.logout),
-            label: const Text("Logout"),
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.userProfile['name'] ?? 'Guest';
+    final email = widget.userProfile['email'] ?? 'unknown@example.com';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Welcome, $name'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
             onPressed: () {
-              UserSession.username = '';
-              UserSession.role = '';
-              Navigator.pushReplacementNamed(context, '/login');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(userProfile: widget.userProfile),
+                ),
+              );
             },
           )
         ],
       ),
-    );
-  }
-
-  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.teal,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Appointment'),
-          BottomNavigationBarItem(icon: Icon(Icons.local_pharmacy), label: 'Medication'),
-          BottomNavigationBarItem(icon: Icon(Icons.feedback), label: 'Feedback'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            const Text(
+              'Upcoming Appointments',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            _appointments.isEmpty
+                ? const Text('No appointments found.')
+                : Column(
+                    children: _appointments.map((appointment) {
+                      final doctor = appointment['doctor'] ?? 'Unknown';
+                      final dateTime = appointment['dateTime'] ?? 'Not set';
+                      return Card(
+                        child: ListTile(
+                          title: Text('Dr. $doctor'),
+                          subtitle: Text('Date: $dateTime'),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+            const SizedBox(height: 24),
+            const Text(
+              'Quick Actions',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.add_circle),
+                  label: const Text('Book Appointment'),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            BookAppointmentPage(userProfile: widget.userProfile),
+                      ),
+                    ).then((_) => _loadAppointments());
+                  },
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.history),
+                  label: const Text('Appointment History'),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            AppointmentHistoryPage(userProfile: widget.userProfile),
+                      ),
+                    );
+                  },
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.feedback),
+                  label: const Text('Feedback'),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            FeedbackPage(userProfile: widget.userProfile),
+                      ),
+                    );
+                  },
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.medical_services),
+                  label: const Text('Order Medication'),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            OrderMedicationPage(userProfile: widget.userProfile),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,51 +1,78 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'feedback_data.dart';
-import 'user_session.dart';
 
-class FeedbackHistoryScreen extends StatelessWidget {
-  const FeedbackHistoryScreen({super.key});
+class FeedbackHistoryPage extends StatefulWidget {
+  const FeedbackHistoryPage({super.key});
+
+  @override
+  State<FeedbackHistoryPage> createState() => _FeedbackHistoryPageState();
+}
+
+class _FeedbackHistoryPageState extends State<FeedbackHistoryPage> {
+  List<FeedbackData> _allFeedback = [];
+  List<FeedbackData> _filteredFeedback = [];
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeedback();
+  }
+
+  Future<void> _loadFeedback() async {
+    final feedback = await FeedbackData.getAll();
+    setState(() {
+      _allFeedback = feedback;
+      _filteredFeedback = feedback;
+    });
+  }
+
+  void _filterFeedback(String query) async {
+    if (query.isEmpty) {
+      setState(() => _filteredFeedback = _allFeedback);
+    } else {
+      final filtered = await FeedbackData.getByName(query);
+      setState(() => _filteredFeedback = filtered);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final feedbackList = FeedbackData.getAll();
-
     return Scaffold(
       appBar: AppBar(title: const Text('Feedback History')),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: feedbackList.length,
-        itemBuilder: (context, index) {
-          final feedback = feedbackList[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8.0),
-            child: ListTile(
-              title: Text(feedback.name),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  RatingBarIndicator(
-                    rating: feedback.rating,
-                    itemBuilder: (context, index) => const Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                    ),
-                    itemCount: 5,
-                    itemSize: 20.0,
-                    direction: Axis.horizontal,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(feedback.comment),
-                ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Search by email or comment',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.edit, color: Colors.teal),
-                onPressed: () => Navigator.pushNamed(context, '/feedback'),
-              ),
+              onChanged: _filterFeedback,
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: _filteredFeedback.isEmpty
+                ? const Center(child: Text('No feedback found.'))
+                : ListView.builder(
+                    itemCount: _filteredFeedback.length,
+                    itemBuilder: (context, index) {
+                      final feedback = _filteredFeedback[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: ListTile(
+                          leading: const Icon(Icons.feedback, color: Colors.blue),
+                          title: Text(feedback.email),
+                          subtitle: Text('Rating: ${feedback.rating}\n"${feedback.comment}"'),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
