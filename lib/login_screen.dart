@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'home_page.dart';
 import 'registration_page.dart';
-import 'user_database.dart'; // ✅ use this instead of DatabaseHelper
+import 'user_database.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,6 +18,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
 
   void _login() async {
+    final loc = AppLocalizations.of(context)!;
+
     if (_formKey.currentState!.validate()) {
       final email = emailController.text.trim();
       final password = passwordController.text;
@@ -26,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
 
         if (user != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Login successful!')),
+            SnackBar(content: Text(loc.loginSuccess)),
           );
           Navigator.pushReplacement(
             context,
@@ -36,12 +39,12 @@ class _LoginPageState extends State<LoginPage> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid email or password')),
+            SnackBar(content: Text(loc.invalidEmailPassword)),
           );
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login error: ${e.toString()}')),
+          SnackBar(content: Text('${loc.loginError}: ${e.toString()}')),
         );
       }
     }
@@ -49,8 +52,10 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
+      appBar: AppBar(title: Text(loc.login)),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Form(
@@ -59,25 +64,25 @@ class _LoginPageState extends State<LoginPage> {
             shrinkWrap: true,
             children: [
               const SizedBox(height: 30),
-              const Text(
-                'Hospital Booking App',
+              Text(
+                loc.appTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 30),
               TextFormField(
                 controller: emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
+                decoration: InputDecoration(labelText: loc.email),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) =>
-                    value == null || value.trim().isEmpty ? 'Enter email' : null,
+                    value == null || value.trim().isEmpty ? loc.enterEmail : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  labelText: 'Password',
+                  labelText: loc.password,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -87,12 +92,12 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 validator: (value) =>
-                    value == null || value.trim().isEmpty ? 'Enter password' : null,
+                    value == null || value.trim().isEmpty ? loc.enterPassword : null,
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _login,
-                child: const Text('Login'),
+                child: Text(loc.login),
               ),
               TextButton(
                 onPressed: () {
@@ -101,7 +106,7 @@ class _LoginPageState extends State<LoginPage> {
                     MaterialPageRoute(builder: (context) => const RegistrationPage()),
                   );
                 },
-                child: const Text("Don't have an account? Register here"),
+                child: Text(loc.noAccountRegister),
               ),
             ],
           ),

@@ -1,6 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'database_helper.dart';
-import 'notification_service.dart'; // ✅ Make sure this file exists
+import 'notification_service.dart';
 
 class BookAppointmentPage extends StatefulWidget {
   final Map<String, dynamic> userProfile;
@@ -13,12 +17,33 @@ class BookAppointmentPage extends StatefulWidget {
 class _BookAppointmentPageState extends State<BookAppointmentPage> {
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
-  final List<String> _doctors = ['Dr. John', 'Dr. Smith', 'Dr. Emma'];
+  File? _profileImage;
+
+  final Map<String, String> _appointmentTypes = {
+    'Cardiology (heart diseases)': 'Dr. John',
+    'Orthopedic (bone & joint issues)': 'Dr. Smith',
+    'General (common illness)': 'Dr. Emma',
+  };
+
+  String? _selectedType;
   String? _selectedDoctor;
-  final TextEditingController _reasonController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileImage();
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('profileImagePath');
+    if (path != null && File(path).existsSync()) {
+      setState(() => _profileImage = File(path));
+    }
+  }
 
   Future<void> _bookAppointment() async {
-    if (_selectedDate != null && _selectedTime != null && _selectedDoctor != null) {
+    if (_selectedDate != null && _selectedTime != null && _selectedType != null) {
       final appointmentDateTime = DateTime(
         _selectedDate!.year,
         _selectedDate!.month,
@@ -31,55 +56,74 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
         'patient_email': widget.userProfile['email'],
         'doctor': _selectedDoctor,
         'dateTime': appointmentDateTime.toIso8601String(),
-        'reason': _reasonController.text.trim(),
+        'reason': _selectedType,
       };
 
       await DatabaseHelper().insertAppointment(appointmentData);
 
-      // ✅ Schedule Notification
-      await NotificationService.scheduleNotification(
-        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title: 'Appointment Reminder',
-        body: 'You have an appointment with $_selectedDoctor',
-        dateTime: appointmentDateTime.subtract(const Duration(hours: 1)),
-      );
+      await NotificationService.scheduleAppointmentReminders(
+  doctorName: _selectedDoctor!,
+  appointmentDateTime: appointmentDateTime,
+);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Appointment booked')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.appointmentBooked)),
         );
         Navigator.pop(context);
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete all fields')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.pleaseCompleteAllFields)),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final name = widget.userProfile['name'] ?? loc.guest;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Book Appointment')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundImage: _profileImage != null
+                  ? FileImage(_profileImage!)
+                  : const AssetImage('assets/default_avatar.png') as ImageProvider,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text('${loc.bookAppointment}, $name')),
+          ],
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
             DropdownButtonFormField<String>(
-              value: _selectedDoctor,
-              decoration: const InputDecoration(labelText: 'Select Doctor'),
-              items: _doctors.map((doctor) {
-                return DropdownMenuItem(
-                  value: doctor,
-                  child: Text(doctor),
-                );
+              value: _selectedType,
+              decoration: InputDecoration(labelText: loc.appointmentType),
+              items: _appointmentTypes.keys.map((type) {
+                return DropdownMenuItem(value: type, child: Text(type));
               }).toList(),
-              onChanged: (value) => setState(() => _selectedDoctor = value),
+              onChanged: (val) {
+                setState(() {
+                  _selectedType = val;
+                  _selectedDoctor = _appointmentTypes[val!];
+                });
+              },
             ),
+            const SizedBox(height: 16),
+            if (_selectedDoctor != null)
+              Text('${loc.assignedDoctor}: $_selectedDoctor',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ListTile(
               title: Text(_selectedDate == null
-                  ? 'Select Date'
+                  ? loc.selectDate
                   : '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
@@ -96,7 +140,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
             ),
             ListTile(
               title: Text(_selectedTime == null
-                  ? 'Select Time'
+                  ? loc.selectTime
                   : _selectedTime!.format(context)),
               trailing: const Icon(Icons.access_time),
               onTap: () async {
@@ -109,19 +153,10 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                 }
               },
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for Appointment',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _bookAppointment,
-              child: const Text('Book Appointment'),
+              child: Text(loc.bookAppointment),
             ),
           ],
         ),

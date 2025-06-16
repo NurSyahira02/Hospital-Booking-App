@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'medication_order.dart' as mo;
+import 'notification_service.dart';
 
 class PharmacyPage extends StatefulWidget {
   final List<mo.MedicationOrder> medicationOrders;
@@ -16,13 +19,66 @@ class PharmacyPage extends StatefulWidget {
 }
 
 class _PharmacyPageState extends State<PharmacyPage> {
-  mo.OrderStatus? selectedFilter;
+  mo.OrderStatus? selectedStatusFilter;
+  String _searchQuery = '';
+  String _dateFilter = 'All'; // All, Today, Upcoming, Past
+  final Map<String, File?> _profileImages = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileImages();
+  }
+
+  Future<void> _loadProfileImages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imageMap = <String, File?>{};
+    for (var order in widget.medicationOrders) {
+      final email = order.patientEmail;
+      final path = prefs.getString('profileImagePath_$email');
+      if (path != null && File(path).existsSync()) {
+        imageMap[email] = File(path);
+      }
+    }
+    setState(() => _profileImages.addAll(imageMap));
+  }
 
   List<mo.MedicationOrder> get filteredOrders {
-    if (selectedFilter == null) return widget.medicationOrders;
-    return widget.medicationOrders
-        .where((order) => order.status == selectedFilter)
-        .toList();
+    final now = DateTime.now();
+
+    return widget.medicationOrders.where((order) {
+      final matchStatus = selectedStatusFilter == null || order.status == selectedStatusFilter;
+      final matchSearch = _searchQuery.isEmpty ||
+          order.patientName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          order.medications.any((m) => m.toLowerCase().contains(_searchQuery.toLowerCase()));
+
+      final pickup = order.pickupDateTime;
+      final isToday = pickup.year == now.year &&
+          pickup.month == now.month &&
+          pickup.day == now.day;
+      final isUpcoming = pickup.isAfter(now);
+      final isPast = pickup.isBefore(now);
+
+      final matchDate = switch (_dateFilter) {
+        'Today' => isToday,
+        'Upcoming' => isUpcoming,
+        'Past' => isPast,
+        _ => true
+      };
+
+      return matchStatus && matchSearch && matchDate;
+    }).toList();
+  }
+
+  Future<void> _sendManualReminder(mo.MedicationOrder order) async {
+    await NotificationService.sendManualReminder(
+      medications: order.medications,
+      location: order.pickupLocation,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Reminder sent to patient')),
+    );
   }
 
   void _showOrderDetails(mo.MedicationOrder order) {
@@ -51,63 +107,55 @@ class _PharmacyPageState extends State<PharmacyPage> {
     );
   }
 
-  Widget _buildStatusIcon(mo.OrderStatus status) {
-    IconData icon = Icons.help_outline;
-    Color color = Colors.grey;
-
-    switch (status) {
-      case mo.OrderStatus.pending:
-        icon = Icons.access_time;
-        color = Colors.orange;
-        break;
-      case mo.OrderStatus.processing:
-        icon = Icons.sync;
-        color = Colors.blue;
-        break;
-      case mo.OrderStatus.approved:
-        icon = Icons.verified;
-        color = Colors.indigo;
-        break;
-      case mo.OrderStatus.completed:
-        icon = Icons.check_circle;
-        color = Colors.green;
-        break;
-    }
-
-    return Icon(icon, color: color);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pharmacy'),
         actions: [
-          DropdownButton<mo.OrderStatus?>(
-            value: selectedFilter,
-            hint: const Text("Filter", style: TextStyle(color: Colors.white)),
-            dropdownColor: Colors.white,
+          DropdownButton<String>(
+            value: _dateFilter,
             underline: Container(),
-            onChanged: (status) {
-              setState(() {
-                selectedFilter = status;
-              });
-            },
+            dropdownColor: Colors.white,
+            onChanged: (value) => setState(() => _dateFilter = value!),
+            items: ['All', 'Today', 'Upcoming', 'Past']
+                .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                .toList(),
+          ),
+          DropdownButton<mo.OrderStatus?>(
+            value: selectedStatusFilter,
+            underline: Container(),
+            dropdownColor: Colors.white,
+            onChanged: (status) => setState(() => selectedStatusFilter = status),
             items: [
               const DropdownMenuItem<mo.OrderStatus?>(
                 value: null,
                 child: Text('All'),
               ),
-              ...mo.OrderStatus.values.map((status) {
-                return DropdownMenuItem<mo.OrderStatus?>(
-                  value: status,
-                  child: Text(status.name),
-                );
-              }),
+              ...mo.OrderStatus.values.map((status) => DropdownMenuItem(
+                    value: status,
+                    child: Text(status.name),
+                  )),
             ],
           ),
           const SizedBox(width: 10),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Search name or medication...',
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (val) => setState(() => _searchQuery = val),
+            ),
+          ),
+        ),
       ),
       body: filteredOrders.isEmpty
           ? const Center(child: Text('No medication orders.'))
@@ -115,38 +163,53 @@ class _PharmacyPageState extends State<PharmacyPage> {
               itemCount: filteredOrders.length,
               itemBuilder: (context, index) {
                 final order = filteredOrders[index];
+                final image = _profileImages[order.patientEmail];
+
                 return Card(
                   margin: const EdgeInsets.all(8),
                   child: ListTile(
-                    leading: _buildStatusIcon(order.status),
+                    leading: CircleAvatar(
+                      backgroundImage: image != null
+                          ? FileImage(image)
+                          : const AssetImage('assets/default_avatar.png') as ImageProvider,
+                    ),
                     title: Text('Patient: ${order.patientName}'),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Pickup: ${order.pickupDateTime}'),
                         Text('Location: ${order.pickupLocation}'),
+                        Text('Status: ${order.status.name}'),
                       ],
                     ),
-                    trailing: DropdownButton<mo.OrderStatus>(
-                      value: order.status,
-                      underline: Container(),
-                      onChanged: (newStatus) {
-                        if (newStatus != null && newStatus != order.status) {
-                          widget.onUpdateStatus(order.id, newStatus);
-                          setState(() {
-                            order.status = newStatus;
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Status updated')),
-                          );
-                        }
-                      },
-                      items: mo.OrderStatus.values.map((status) {
-                        return DropdownMenuItem(
-                          value: status,
-                          child: Text(status.name),
-                        );
-                      }).toList(),
+                    trailing: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButton<mo.OrderStatus>(
+                          value: order.status,
+                          underline: Container(),
+                          onChanged: (newStatus) {
+                            if (newStatus != null && newStatus != order.status) {
+                              widget.onUpdateStatus(order.id, newStatus);
+                              setState(() => order.status = newStatus);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Status updated')),
+                              );
+                            }
+                          },
+                          items: mo.OrderStatus.values.map((status) {
+                            return DropdownMenuItem(
+                              value: status,
+                              child: Text(status.name),
+                            );
+                          }).toList(),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.notifications),
+                          tooltip: 'Send Reminder',
+                          onPressed: () => _sendManualReminder(order),
+                        ),
+                      ],
                     ),
                     onTap: () => _showOrderDetails(order),
                   ),

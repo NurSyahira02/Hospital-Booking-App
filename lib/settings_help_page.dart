@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'theme_provider.dart';
+import 'locale_provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SettingsHelpPage extends StatefulWidget {
   const SettingsHelpPage({super.key});
@@ -13,21 +17,35 @@ class SettingsHelpPage extends StatefulWidget {
 class _SettingsHelpPageState extends State<SettingsHelpPage> {
   double _rating = 3.0;
   final _feedbackController = TextEditingController();
+  File? _profileImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileImage();
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final path = prefs.getString('profileImagePath');
+    if (path != null && File(path).existsSync()) {
+      setState(() => _profileImage = File(path));
+    }
+  }
 
   void _submitFeedback() {
+    final loc = AppLocalizations.of(context)!;
     final feedback = _feedbackController.text.trim();
     if (feedback.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter feedback.')),
+        SnackBar(content: Text(loc.enterFeedback)),
       );
       return;
     }
 
-    // ✅ Simulate saving feedback (e.g., store or send to server)
     _feedbackController.clear();
-
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thank you for your feedback!')),
+      SnackBar(content: Text(loc.feedbackThanks)),
     );
   }
 
@@ -39,56 +57,80 @@ class _SettingsHelpPageState extends State<SettingsHelpPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final currentLang = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Settings & Help")),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundImage: _profileImage != null
+                  ? FileImage(_profileImage!)
+                  : const AssetImage('assets/default_avatar.png') as ImageProvider,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(loc.settings)),
+          ],
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text("App Settings",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(loc.appTitle,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
 
           SwitchListTile(
-            title: const Text("Dark Mode"),
+            title: Text(loc.darkMode),
             secondary: const Icon(Icons.brightness_6),
             value: isDarkMode,
             onChanged: (value) {
-              final themeProvider =
-                  Provider.of<ThemeProvider>(context, listen: false);
+              final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
               themeProvider.toggleTheme(value);
             },
           ),
 
-          const Divider(height: 32),
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: Text(loc.language),
+            subtitle: Text(currentLang == 'en' ? 'English' : 'Bahasa Melayu'),
+            onTap: () {
+              final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+              final newLocale = currentLang == 'en' ? const Locale('ms') : const Locale('en');
+              localeProvider.setLocale(newLocale);
+            },
+          ),
 
-          const Text("Help & Support",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Divider(height: 32),
+          Text(loc.helpSupport,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
 
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text("About This App"),
-            subtitle: const Text("Version 1.0.0\nHospital Booking App for Patients"),
+            title: Text(loc.aboutApp),
+            subtitle: Text(loc.aboutAppDetails),
           ),
           ListTile(
             leading: const Icon(Icons.help_outline),
-            title: const Text("How to use"),
-            subtitle: const Text("Login, book appointments, order medication, view history."),
+            title: Text(loc.howToUse),
+            subtitle: Text(loc.howToUseDetails),
           ),
           ListTile(
             leading: const Icon(Icons.contact_support),
-            title: const Text("Contact Support"),
-            subtitle: const Text("Email: support@hospitalapp.com"),
+            title: Text(loc.contactSupport),
+            subtitle: Text(loc.contactSupportDetails),
           ),
 
           const Divider(height: 32),
-          const Text("Send Feedback",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(loc.sendFeedback,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
 
-          const Text("Rate your experience:"),
+          Text(loc.rateExperience),
           RatingBar.builder(
             initialRating: _rating,
             minRating: 1,
@@ -106,14 +148,14 @@ class _SettingsHelpPageState extends State<SettingsHelpPage> {
             controller: _feedbackController,
             maxLines: 4,
             decoration: InputDecoration(
-              labelText: 'Your feedback',
+              labelText: loc.yourFeedback,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
             icon: const Icon(Icons.send),
-            label: const Text('Submit Feedback'),
+            label: Text(loc.submitFeedback),
             onPressed: _submitFeedback,
           ),
         ],

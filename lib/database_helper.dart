@@ -18,9 +18,9 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'hospital_app.db');
     return await openDatabase(
       path,
-      version: 2, // ✅ bump version
+      version: 3, // ✅ Updated version
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade, // ✅ support migration
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -32,7 +32,9 @@ class DatabaseHelper {
         email TEXT UNIQUE,
         phone TEXT,
         gender TEXT,
-        password TEXT
+        password TEXT,
+        age TEXT,
+        address TEXT
       )
     ''');
 
@@ -48,13 +50,16 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE TABLE medication_orders(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
+        patient_name TEXT,
         patient_email TEXT,
-        medication TEXT,
+        medications TEXT,
         quantity INTEGER,
         is_child BOOLEAN,
         delivery_method TEXT,
         address TEXT,
+        pickup_location TEXT,
+        pickup_datetime TEXT,
         status TEXT
       )
     ''');
@@ -69,10 +74,28 @@ class DatabaseHelper {
     ''');
   }
 
-  // ✅ Migration for old users (v1 → v2)
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // You can add specific upgrade logic if needed later
     if (oldVersion < 2) {
       await db.execute("ALTER TABLE appointments ADD COLUMN reason TEXT");
+    }
+    if (oldVersion < 3) {
+      await db.execute('DROP TABLE IF EXISTS medication_orders');
+      await db.execute('''
+        CREATE TABLE medication_orders(
+          id TEXT PRIMARY KEY,
+          patient_name TEXT,
+          patient_email TEXT,
+          medications TEXT,
+          quantity INTEGER,
+          is_child BOOLEAN,
+          delivery_method TEXT,
+          address TEXT,
+          pickup_location TEXT,
+          pickup_datetime TEXT,
+          status TEXT
+        )
+      ''');
     }
   }
 
@@ -88,10 +111,6 @@ class DatabaseHelper {
       where: 'email = ? AND password = ?',
       whereArgs: [email, password],
     );
-
-    print('Login attempt with email: $email');
-    print('Login ${result.isNotEmpty ? 'successful' : 'failed'}');
-
     return result.isNotEmpty ? result.first : null;
   }
 

@@ -36,7 +36,17 @@ class _MedicationOrderScreenState extends State<MedicationOrderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Medication Orders')),
+      appBar: AppBar(
+        title: const Text('Medication Orders'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.pushNamed(context, '/settings'); // ✅ Named route
+            },
+          ),
+        ],
+      ),
       body: _orders.isEmpty
           ? const Center(child: Text('No orders found'))
           : ListView.builder(
@@ -46,7 +56,7 @@ class _MedicationOrderScreenState extends State<MedicationOrderScreen> {
                 return Card(
                   margin: const EdgeInsets.all(8),
                   child: ListTile(
-                    title: Text(order.medications.join(', ')), // ✅ Fix here
+                    title: Text(order.medications.join(', ')), // ✅ Fixed display
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -60,7 +70,7 @@ class _MedicationOrderScreenState extends State<MedicationOrderScreen> {
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteOrder(order.id), // ✅ Uses correct type
+                      onPressed: () => _deleteOrder(order.id),
                     ),
                   ),
                 );

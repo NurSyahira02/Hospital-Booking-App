@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'user_database.dart'; // ✅ Make sure this import exists
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'user_database.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -36,6 +37,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   void _submitForm() async {
+    final loc = AppLocalizations.of(context)!;
+
     if (_formKey.currentState!.validate()) {
       final user = {
         'name': nameController.text.trim(),
@@ -51,13 +54,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
         final result = await UserDatabase().registerUser(user);
         if (result > 0) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registration successful!')),
+            SnackBar(content: Text(loc.registrationSuccess)),
           );
-          Navigator.pop(context); // Go back to login
+          Navigator.pop(context);
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('${loc.error}: ${e.toString()}')),
         );
       }
     }
@@ -65,8 +68,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Patient Registration')),
+      appBar: AppBar(title: Text(loc.patientRegistration)),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -75,79 +80,91 @@ class _RegistrationPageState extends State<RegistrationPage> {
             children: [
               TextFormField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Full Name'),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Enter full name' : null,
+                decoration: InputDecoration(labelText: loc.fullName),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? loc.enterFullName : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
+                decoration: InputDecoration(labelText: loc.email),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) return 'Enter email';
+                  if (value == null || value.trim().isEmpty) return loc.enterEmail;
                   final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  if (!emailRegex.hasMatch(value.trim())) return 'Enter a valid email address';
+                  if (!emailRegex.hasMatch(value.trim())) return loc.enterValidEmail;
                   return null;
                 },
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Phone Number'),
+                decoration: InputDecoration(labelText: loc.phoneNumber),
                 keyboardType: TextInputType.phone,
-                validator: (value) => value == null || value.trim().isEmpty ? 'Enter phone number' : null,
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? loc.enterPhoneNumber : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _selectedGender,
-                decoration: const InputDecoration(labelText: 'Gender'),
-                items: _genders.map((gender) => DropdownMenuItem(value: gender, child: Text(gender))).toList(),
+                decoration: InputDecoration(labelText: loc.gender),
+                items: _genders.map((gender) {
+                  return DropdownMenuItem(value: gender, child: Text(gender));
+                }).toList(),
                 onChanged: (value) => setState(() => _selectedGender = value!),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: ageController,
-                decoration: const InputDecoration(labelText: 'Age'),
+                decoration: InputDecoration(labelText: loc.age),
                 keyboardType: TextInputType.number,
-                validator: (value) => value == null || value.trim().isEmpty ? 'Enter age' : null,
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? loc.enterAge : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: addressController,
-                decoration: const InputDecoration(labelText: 'Address'),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Enter address' : null,
+                decoration: InputDecoration(labelText: loc.address),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? loc.enterAddress : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  labelText: 'Password',
+                  labelText: loc.password,
                   suffixIcon: IconButton(
                     icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
-                validator: (value) => value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
+                validator: (value) => value == null || value.length < 6
+                    ? loc.passwordLength
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
                 decoration: InputDecoration(
-                  labelText: 'Confirm Password',
+                  labelText: loc.confirmPassword,
                   suffixIcon: IconButton(
-                    icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () =>
+                        setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                   ),
                 ),
-                validator: (value) =>
-                    value != passwordController.text ? 'Passwords do not match' : null,
+                validator: (value) => value != passwordController.text
+                    ? loc.passwordMismatch
+                    : null,
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _submitForm,
-                child: const Text('Register'),
+                child: Text(loc.register),
               ),
             ],
           ),
