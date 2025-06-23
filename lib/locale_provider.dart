@@ -6,7 +6,8 @@ class LocaleProvider extends ChangeNotifier {
   Locale get locale => _locale;
 
   void toggleLocale() {
-    _locale = _locale.languageCode == 'en' ? const Locale('ms') : const Locale('en');
+    _locale =
+        _locale.languageCode == 'en' ? const Locale('ms') : const Locale('en');
     notifyListeners();
   }
 

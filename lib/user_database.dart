@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'hash_helper.dart'; // ✅ Import the hashing helper
+import 'hash_helper.dart'; // Import the hashing helper
 
 class UserDatabase {
   static final UserDatabase _instance = UserDatabase._internal();
@@ -35,12 +35,11 @@ class UserDatabase {
     address TEXT
   )
 ''');
-
       },
     );
   }
 
-  // ✅ Registration: Hash password before storing
+  // Registration: Hash password before storing
   Future<int> registerUser(Map<String, dynamic> user) async {
     final db = await database;
 
@@ -55,7 +54,7 @@ class UserDatabase {
     );
   }
 
-  // ✅ Login: Hash the input password before comparing
+  // Login: Hash the input password before comparing
   Future<Map<String, dynamic>?> authenticate(
     String email,
     String password,

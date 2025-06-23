@@ -6,74 +6,65 @@ import 'database_helper.dart';
 
 class ViewMedicationOrdersPage extends StatefulWidget {
   final Map<String, dynamic> userProfile;
-  const ViewMedicationOrdersPage({super.key, required this.userProfile});
+  const ViewMedicationOrdersPage({Key? key, required this.userProfile})
+    : super(key: key);
 
   @override
-  State<ViewMedicationOrdersPage> createState() => _ViewMedicationOrdersPageState();
+  _ViewMedicationOrdersPageState createState() =>
+      _ViewMedicationOrdersPageState();
 }
 
 class _ViewMedicationOrdersPageState extends State<ViewMedicationOrdersPage> {
-  List<Map<String, dynamic>> _orders = [];
+  Map<String, List<Map<String, dynamic>>> groupedOrders = {};
+  bool showUpcoming = true;
   File? _profileImage;
-  bool _showUpcomingOnly = true;
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
     _loadProfileImage();
-  }
-
-  Future<void> _loadOrders() async {
-    final all = await DatabaseHelper().getAllMedicationOrders();
-    final email = widget.userProfile['email'];
-
-    final filtered = all.where((order) => order['patient_email'] == email).toList();
-    filtered.sort((a, b) => b['id'].compareTo(a['id']));
-    setState(() => _orders = filtered);
+    _loadMedicationOrders();
   }
 
   Future<void> _loadProfileImage() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('profileImagePath');
+    final email = prefs.getString('loggedInEmail');
+    final path = prefs.getString('profileImagePath_$email');
     if (path != null && File(path).existsSync()) {
       setState(() => _profileImage = File(path));
     }
   }
 
-  Future<void> _deleteOrder(int id) async {
-    await DatabaseHelper().deleteMedicationOrder(id);
-    _loadOrders();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.orderDeleted)),
-      );
-    }
-  }
+  Future<void> _loadMedicationOrders() async {
+    final email = widget.userProfile['email'];
+    final all = await DatabaseHelper().getAllMedicationOrders();
+    final filtered =
+        all.where((order) => order['patient_email'] == email).toList();
 
-  String _translateStatus(String status, AppLocalizations loc) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return loc.statusPending;
-      case 'ready':
-        return loc.statusReady;
-      case 'completed':
-        return loc.statusCompleted;
-      case 'cancelled':
-        return loc.statusCancelled;
-      default:
-        return status;
+    final now = DateTime.now();
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+
+    for (var order in filtered) {
+      final pickup = DateTime.tryParse(order['pickup_datetime'] ?? '');
+      if (pickup == null) continue;
+
+      final isUpcoming = pickup.isAfter(now);
+      if ((showUpcoming && !isUpcoming) || (!showUpcoming && isUpcoming))
+        continue;
+
+      final disease = order['disease'] ?? 'Other';
+      grouped.putIfAbsent(disease, () => []).add(order);
     }
+
+    setState(() {
+      groupedOrders = grouped;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-
-    final filteredOrders = _orders.where((order) {
-      final pickup = DateTime.tryParse(order['pickupDateTime'] ?? '') ?? DateTime.now();
-      return _showUpcomingOnly ? pickup.isAfter(DateTime.now()) : pickup.isBefore(DateTime.now());
-    }).toList();
+    final name = widget.userProfile['name'] ?? loc.guest;
 
     return Scaffold(
       appBar: AppBar(
@@ -81,88 +72,108 @@ class _ViewMedicationOrdersPageState extends State<ViewMedicationOrdersPage> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: _profileImage != null
-                  ? FileImage(_profileImage!)
-                  : const AssetImage('assets/default_avatar.png') as ImageProvider,
+              backgroundImage:
+                  _profileImage != null
+                      ? FileImage(_profileImage!)
+                      : const AssetImage('assets/default_avatar.png')
+                          as ImageProvider,
             ),
             const SizedBox(width: 10),
-            Text(loc.orderMedication),
+            Expanded(child: Text("${loc.viewMedicationOrders} - $name")),
           ],
         ),
         actions: [
-          PopupMenuButton<bool>(
-            initialValue: _showUpcomingOnly,
-            onSelected: (value) => setState(() => _showUpcomingOnly = value),
-            itemBuilder: (context) => [
-              PopupMenuItem(value: true, child: Text(loc.upcomingAppointments)),
-              PopupMenuItem(value: false, child: Text(loc.pastAppointments)),
-            ],
-          )
+          IconButton(
+            icon: Icon(showUpcoming ? Icons.history : Icons.upcoming),
+            tooltip: showUpcoming ? loc.showPastOrders : loc.showUpcomingOrders,
+            onPressed: () {
+              setState(() {
+                showUpcoming = !showUpcoming;
+              });
+              _loadMedicationOrders();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: loc.refresh,
+            onPressed: () async {
+              await _loadMedicationOrders();
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(loc.ordersRefreshed)));
+            },
+          ),
         ],
       ),
-      body: filteredOrders.isEmpty
-          ? Center(
-              child: Text(_showUpcomingOnly
-                  ? loc.noUpcomingOrders
-                  : loc.noPastOrders),
-            )
-          : ListView.builder(
-              itemCount: filteredOrders.length,
-              itemBuilder: (context, index) {
-                final order = filteredOrders[index];
-                final meds = (order['medication'] as String?)?.split(', ') ?? [];
-                final status = _translateStatus(order['status'] ?? 'Pending', loc);
-                final date = order['pickupDateTime'] ?? '';
-                final method = order['delivery_method'] ?? '-';
-                final location = order['pickup_location'] ?? '-';
-
-                return GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: Text(loc.cancelOrder),
-                        content: Text(loc.cancelOrderConfirm),
-                        actions: [
-                          TextButton(
-                            child: Text(loc.cancel),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                          TextButton(
-                            child: Text(loc.logoutYes),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _deleteOrder(order['id']);
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${loc.medications}: ${meds.join(', ')}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 6),
-                          Text('${loc.pickupLocation}: $location'),
-                          Text('${loc.date}: $date'),
-                          Text('${loc.deliveryMethod}: $method'),
-                          Text('${loc.status}: $status'),
-                        ],
+      body: RefreshIndicator(
+        onRefresh: _loadMedicationOrders,
+        child:
+            groupedOrders.isEmpty
+                ? ListView(
+                  children: [
+                    const SizedBox(height: 200),
+                    Center(
+                      child: Text(
+                        showUpcoming ? loc.noUpcomingOrders : loc.noPastOrders,
+                        style: const TextStyle(fontSize: 16),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  ],
+                )
+                : ListView(
+                  children:
+                      groupedOrders.entries.map((entry) {
+                        final disease = entry.key;
+                        final orders = entry.value;
+
+                        return ExpansionTile(
+                          title: Text(
+                            disease,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          children:
+                              orders.map((order) {
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  child: ListTile(
+                                    title: Text(
+                                      "${loc.medications}: ${order['medications']}",
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "${loc.deliveryMethod}: ${order['delivery_method']}",
+                                        ),
+                                        if (order['delivery_method'] ==
+                                            'Pickup')
+                                          Text(
+                                            "${loc.pickupLocation}: ${order['pickup_location']}",
+                                          ),
+                                        if (order['delivery_method'] ==
+                                            'Courier')
+                                          Text(
+                                            "${loc.deliveryAddress}: ${order['address']}",
+                                          ),
+                                        Text(
+                                          "${loc.pickupTime}: ${order['pickup_datetime']}",
+                                        ),
+                                        Text(
+                                          "${loc.status}: ${order['status']}",
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                        );
+                      }).toList(),
+                ),
+      ),
     );
   }
 }

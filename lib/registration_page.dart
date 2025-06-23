@@ -22,7 +22,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String _selectedGender = 'Male';
-  final List<String> _genders = ['Male', 'Female', 'Other'];
+  final List<String> _genders = ['Male', 'Female'];
 
   @override
   void dispose() {
@@ -53,9 +53,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
       try {
         final result = await UserDatabase().registerUser(user);
         if (result > 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.registrationSuccess)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(loc.registrationSuccess)));
           Navigator.pop(context);
         }
       } catch (e) {
@@ -81,8 +81,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
               TextFormField(
                 controller: nameController,
                 decoration: InputDecoration(labelText: loc.fullName),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? loc.enterFullName : null,
+                validator:
+                    (value) =>
+                        value == null || value.trim().isEmpty
+                            ? loc.enterFullName
+                            : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -90,9 +93,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 decoration: InputDecoration(labelText: loc.email),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) return loc.enterEmail;
+                  if (value == null || value.trim().isEmpty)
+                    return loc.enterEmail;
                   final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  if (!emailRegex.hasMatch(value.trim())) return loc.enterValidEmail;
+                  if (!emailRegex.hasMatch(value.trim()))
+                    return loc.enterValidEmail;
                   return null;
                 },
               ),
@@ -101,16 +106,23 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 controller: phoneController,
                 decoration: InputDecoration(labelText: loc.phoneNumber),
                 keyboardType: TextInputType.phone,
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? loc.enterPhoneNumber : null,
+                validator:
+                    (value) =>
+                        value == null || value.trim().isEmpty
+                            ? loc.enterPhoneNumber
+                            : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _selectedGender,
                 decoration: InputDecoration(labelText: loc.gender),
-                items: _genders.map((gender) {
-                  return DropdownMenuItem(value: gender, child: Text(gender));
-                }).toList(),
+                items:
+                    _genders.map((gender) {
+                      return DropdownMenuItem(
+                        value: gender,
+                        child: Text(gender),
+                      );
+                    }).toList(),
                 onChanged: (value) => setState(() => _selectedGender = value!),
               ),
               const SizedBox(height: 16),
@@ -118,15 +130,21 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 controller: ageController,
                 decoration: InputDecoration(labelText: loc.age),
                 keyboardType: TextInputType.number,
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? loc.enterAge : null,
+                validator:
+                    (value) =>
+                        value == null || value.trim().isEmpty
+                            ? loc.enterAge
+                            : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: addressController,
                 decoration: InputDecoration(labelText: loc.address),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? loc.enterAddress : null,
+                validator:
+                    (value) =>
+                        value == null || value.trim().isEmpty
+                            ? loc.enterAddress
+                            : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -135,14 +153,22 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 decoration: InputDecoration(
                   labelText: loc.password,
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed:
+                        () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                   ),
                 ),
-                validator: (value) => value == null || value.length < 6
-                    ? loc.passwordLength
-                    : null,
+                validator:
+                    (value) =>
+                        value == null || value.length < 6
+                            ? loc.passwordLength
+                            : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -152,20 +178,26 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   labelText: loc.confirmPassword,
                   suffixIcon: IconButton(
                     icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () =>
-                        setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed:
+                        () => setState(
+                          () =>
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                        ),
                   ),
                 ),
-                validator: (value) => value != passwordController.text
-                    ? loc.passwordMismatch
-                    : null,
+                validator:
+                    (value) =>
+                        value != passwordController.text
+                            ? loc.passwordMismatch
+                            : null,
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _submitForm,
-                child: Text(loc.register),
-              ),
+              ElevatedButton(onPressed: _submitForm, child: Text(loc.register)),
             ],
           ),
         ),

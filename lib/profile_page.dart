@@ -23,7 +23,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadImage() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('profileImagePath'); // Unified key
+    final email = widget.userProfile['email'];
+    final path = prefs.getString(
+      'profileImagePath_$email',
+    ); // Unique to each user
     if (path != null && File(path).existsSync()) {
       setState(() => _profileImage = File(path));
     }
@@ -34,7 +37,11 @@ class _ProfilePageState extends State<ProfilePage> {
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('profileImagePath', picked.path);
+      final email = widget.userProfile['email'];
+      await prefs.setString(
+        'profileImagePath_$email',
+        picked.path,
+      ); // Save with email key
       setState(() => _profileImage = File(picked.path));
 
       if (mounted) {
@@ -64,9 +71,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   CircleAvatar(
                     radius: 60,
-                    backgroundImage: _profileImage != null
-                        ? FileImage(_profileImage!)
-                        : const AssetImage('assets/default_avatar.png') as ImageProvider,
+                    backgroundImage:
+                        _profileImage != null
+                            ? FileImage(_profileImage!)
+                            : const AssetImage('assets/default_avatar.png')
+                                as ImageProvider,
                   ),
                   Positioned(
                     bottom: 0,

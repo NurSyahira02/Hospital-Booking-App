@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_page.dart';
 import 'registration_page.dart';
 import 'user_database.dart';
@@ -28,9 +29,13 @@ class _LoginPageState extends State<LoginPage> {
         final user = await UserDatabase().authenticate(email, password);
 
         if (user != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.loginSuccess)),
-          );
+          // Save the logged-in email for per-user profile image tracking
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('loggedInEmail', email);
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(loc.loginSuccess)));
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -38,9 +43,9 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.invalidEmailPassword)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(loc.invalidEmailPassword)));
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -67,15 +72,21 @@ class _LoginPageState extends State<LoginPage> {
               Text(
                 loc.appTitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 30),
               TextFormField(
                 controller: emailController,
                 decoration: InputDecoration(labelText: loc.email),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? loc.enterEmail : null,
+                validator:
+                    (value) =>
+                        value == null || value.trim().isEmpty
+                            ? loc.enterEmail
+                            : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -85,25 +96,31 @@ class _LoginPageState extends State<LoginPage> {
                   labelText: loc.password,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed:
+                        () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                   ),
                 ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty ? loc.enterPassword : null,
+                validator:
+                    (value) =>
+                        value == null || value.trim().isEmpty
+                            ? loc.enterPassword
+                            : null,
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _login,
-                child: Text(loc.login),
-              ),
+              ElevatedButton(onPressed: _login, child: Text(loc.login)),
               TextButton(
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const RegistrationPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const RegistrationPage(),
+                    ),
                   );
                 },
                 child: Text(loc.noAccountRegister),

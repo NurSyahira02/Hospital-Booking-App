@@ -5,12 +5,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
-// Screens and providers
+// Screens and Providers
 import 'login_screen.dart';
 import 'registration_page.dart';
+import 'settings_help_page.dart';
 import 'theme_provider.dart';
 import 'locale_provider.dart';
-import 'settings_help_page.dart';
 
 // Localization
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -55,7 +55,7 @@ class HospitalApp extends StatelessWidget {
       title: 'Hospital Booking App',
       debugShowCheckedModeBanner: false,
 
-      // 🌞 Custom Light Theme
+      // 🌞 Light Theme
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.teal,
@@ -76,7 +76,7 @@ class HospitalApp extends StatelessWidget {
         ),
       ),
 
-      // 🌙 Custom Dark Theme
+      // 🌙 Dark Theme
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.teal,
@@ -102,10 +102,12 @@ class HospitalApp extends StatelessWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: const LoginPage(),
+
       routes: {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegistrationPage(),
         '/settings': (context) => const SettingsHelpPage(),
+        // Feedback route intentionally removed
       },
     );
   }

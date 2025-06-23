@@ -16,7 +16,7 @@ class Appointment {
   factory Appointment.fromMap(Map<String, dynamic> map) {
     return Appointment(
       id: map['id'].toString(),
-      patientEmail: map['patient_email'], // ✅ DB = patient_email
+      patientEmail: map['patient_email'], // DB = patient_email
       doctor: map['doctor'],
       dateTime: map['dateTime'],
       reason: map['reason'],
@@ -33,4 +33,3 @@ class Appointment {
     };
   }
 }
-

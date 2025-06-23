@@ -1,17 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'medication_order.dart' as mo;
 import 'notification_service.dart';
 
 class PharmacyPage extends StatefulWidget {
   final List<mo.MedicationOrder> medicationOrders;
-  final Function(String orderId, mo.OrderStatus status) onUpdateStatus;
+  final String currentPatientEmail;
 
   const PharmacyPage({
     super.key,
     required this.medicationOrders,
-    required this.onUpdateStatus,
+    required this.currentPatientEmail,
   });
 
   @override
@@ -19,9 +20,8 @@ class PharmacyPage extends StatefulWidget {
 }
 
 class _PharmacyPageState extends State<PharmacyPage> {
-  mo.OrderStatus? selectedStatusFilter;
   String _searchQuery = '';
-  String _dateFilter = 'All'; // All, Today, Upcoming, Past
+  String _diseaseFilter = 'All';
   final Map<String, File?> _profileImages = {};
 
   @override
@@ -44,30 +44,30 @@ class _PharmacyPageState extends State<PharmacyPage> {
   }
 
   List<mo.MedicationOrder> get filteredOrders {
-    final now = DateTime.now();
+    return widget.medicationOrders
+        .where((order) => order.patientEmail == widget.currentPatientEmail)
+        .where((order) {
+          final disease =
+              order.disease == 'Unknown' ? 'General' : order.disease;
+          final matchDisease =
+              _diseaseFilter == 'All' || disease == _diseaseFilter;
+          final matchSearch =
+              _searchQuery.isEmpty ||
+              order.medications.any(
+                (m) => m.toLowerCase().contains(_searchQuery.toLowerCase()),
+              );
+          return matchDisease && matchSearch;
+        })
+        .toList();
+  }
 
-    return widget.medicationOrders.where((order) {
-      final matchStatus = selectedStatusFilter == null || order.status == selectedStatusFilter;
-      final matchSearch = _searchQuery.isEmpty ||
-          order.patientName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          order.medications.any((m) => m.toLowerCase().contains(_searchQuery.toLowerCase()));
-
-      final pickup = order.pickupDateTime;
-      final isToday = pickup.year == now.year &&
-          pickup.month == now.month &&
-          pickup.day == now.day;
-      final isUpcoming = pickup.isAfter(now);
-      final isPast = pickup.isBefore(now);
-
-      final matchDate = switch (_dateFilter) {
-        'Today' => isToday,
-        'Upcoming' => isUpcoming,
-        'Past' => isPast,
-        _ => true
-      };
-
-      return matchStatus && matchSearch && matchDate;
-    }).toList();
+  Map<String, List<mo.MedicationOrder>> get groupedByDisease {
+    final Map<String, List<mo.MedicationOrder>> map = {};
+    for (var order in filteredOrders) {
+      final diseaseKey = order.disease == 'Unknown' ? 'General' : order.disease;
+      map.putIfAbsent(diseaseKey, () => []).add(order);
+    }
+    return map;
   }
 
   Future<void> _sendManualReminder(mo.MedicationOrder order) async {
@@ -75,147 +75,171 @@ class _PharmacyPageState extends State<PharmacyPage> {
       medications: order.medications,
       location: order.pickupLocation,
     );
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reminder sent to patient')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Reminder sent to patient')));
   }
 
-  void _showOrderDetails(mo.MedicationOrder order) {
+  void _cancelOrder(mo.MedicationOrder order) {
+    final loc = AppLocalizations.of(context)!;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Order Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Patient: ${order.patientName}'),
-            Text('Medications:\n${order.medications.join('\n')}'),
-            Text('Pickup Location: ${order.pickupLocation}'),
-            Text('Pickup Time: ${order.pickupDateTime}'),
-            Text('Status: ${order.status.name}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      builder:
+          (ctx) => AlertDialog(
+            title: Text(loc.confirmCancel),
+            content: Text(loc.cancelConfirmation),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(loc.no),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() => order.status = mo.OrderStatus.cancelled);
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(loc.orderCancelled)));
+                },
+                child: Text(loc.yes),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final uniqueDiseases = {
+      'All',
+      ...widget.medicationOrders
+          .where((o) => o.patientEmail == widget.currentPatientEmail)
+          .map((o) => o.disease == 'Unknown' ? 'General' : o.disease),
+    };
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pharmacy'),
-        actions: [
-          DropdownButton<String>(
-            value: _dateFilter,
-            underline: Container(),
-            dropdownColor: Colors.white,
-            onChanged: (value) => setState(() => _dateFilter = value!),
-            items: ['All', 'Today', 'Upcoming', 'Past']
-                .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                .toList(),
-          ),
-          DropdownButton<mo.OrderStatus?>(
-            value: selectedStatusFilter,
-            underline: Container(),
-            dropdownColor: Colors.white,
-            onChanged: (status) => setState(() => selectedStatusFilter = status),
-            items: [
-              const DropdownMenuItem<mo.OrderStatus?>(
-                value: null,
-                child: Text('All'),
-              ),
-              ...mo.OrderStatus.values.map((status) => DropdownMenuItem(
-                    value: status,
-                    child: Text(status.name),
-                  )),
-            ],
-          ),
-          const SizedBox(width: 10),
-        ],
+        title: Text(loc.pharmacy),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search name or medication...',
-                filled: true,
-                fillColor: Colors.white,
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
+          preferredSize: const Size.fromHeight(90),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 4,
+                ),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: loc.searchMedicationOrPatient,
+                    filled: true,
+                    fillColor: Colors.white,
+                    prefixIcon: const Icon(Icons.search),
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                ),
               ),
-              onChanged: (val) => setState(() => _searchQuery = val),
-            ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: DropdownButton<String>(
+                  value: _diseaseFilter,
+                  onChanged: (val) => setState(() => _diseaseFilter = val!),
+                  items:
+                      uniqueDiseases
+                          .map(
+                            (d) => DropdownMenuItem(value: d, child: Text(d)),
+                          )
+                          .toList(),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-      body: filteredOrders.isEmpty
-          ? const Center(child: Text('No medication orders.'))
-          : ListView.builder(
-              itemCount: filteredOrders.length,
-              itemBuilder: (context, index) {
-                final order = filteredOrders[index];
-                final image = _profileImages[order.patientEmail];
+      body:
+          groupedByDisease.isEmpty
+              ? Center(child: Text(loc.noMedicationOrders))
+              : ListView(
+                children:
+                    groupedByDisease.entries.map((entry) {
+                      final disease = entry.key;
+                      final orders = entry.value;
 
-                return Card(
-                  margin: const EdgeInsets.all(8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: image != null
-                          ? FileImage(image)
-                          : const AssetImage('assets/default_avatar.png') as ImageProvider,
-                    ),
-                    title: Text('Patient: ${order.patientName}'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Pickup: ${order.pickupDateTime}'),
-                        Text('Location: ${order.pickupLocation}'),
-                        Text('Status: ${order.status.name}'),
-                      ],
-                    ),
-                    trailing: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        DropdownButton<mo.OrderStatus>(
-                          value: order.status,
-                          underline: Container(),
-                          onChanged: (newStatus) {
-                            if (newStatus != null && newStatus != order.status) {
-                              widget.onUpdateStatus(order.id, newStatus);
-                              setState(() => order.status = newStatus);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Status updated')),
-                              );
-                            }
-                          },
-                          items: mo.OrderStatus.values.map((status) {
-                            return DropdownMenuItem(
-                              value: status,
-                              child: Text(status.name),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                            child: Text(
+                              '🦠 $disease',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          ...orders.map((order) {
+                            final image = _profileImages[order.patientEmail];
+
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundImage:
+                                      image != null
+                                          ? FileImage(image)
+                                          : const AssetImage(
+                                                'assets/default_avatar.png',
+                                              )
+                                              as ImageProvider,
+                                ),
+                                title: Text(
+                                  '${loc.patient}: ${order.patientName}',
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${loc.pickupTime}: ${order.pickupDateTime}',
+                                    ),
+                                    Text(
+                                      '${loc.pickupLocation}: ${order.pickupLocation}',
+                                    ),
+                                    Text('${loc.status}: ${order.status.name}'),
+                                  ],
+                                ),
+                                trailing: Wrap(
+                                  direction: Axis.vertical,
+                                  spacing: 4,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.notifications),
+                                      tooltip: loc.sendReminder,
+                                      onPressed:
+                                          () => _sendManualReminder(order),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.cancel,
+                                        color: Colors.red,
+                                      ),
+                                      tooltip: loc.cancel,
+                                      onPressed: () => _cancelOrder(order),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             );
-                          }).toList(),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.notifications),
-                          tooltip: 'Send Reminder',
-                          onPressed: () => _sendManualReminder(order),
-                        ),
-                      ],
-                    ),
-                    onTap: () => _showOrderDetails(order),
-                  ),
-                );
-              },
-            ),
+                          }),
+                        ],
+                      );
+                    }).toList(),
+              ),
     );
   }
 }

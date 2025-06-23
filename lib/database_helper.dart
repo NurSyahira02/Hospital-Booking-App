@@ -18,7 +18,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'hospital_app.db');
     return await openDatabase(
       path,
-      version: 3, // ✅ Updated version
+      version: 5, // 
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -60,7 +60,8 @@ class DatabaseHelper {
         address TEXT,
         pickup_location TEXT,
         pickup_datetime TEXT,
-        status TEXT
+        status TEXT,
+        disease TEXT
       )
     ''');
 
@@ -72,10 +73,18 @@ class DatabaseHelper {
         comment TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE improvements(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT,
+        message TEXT,
+        timestamp TEXT
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // You can add specific upgrade logic if needed later
     if (oldVersion < 2) {
       await db.execute("ALTER TABLE appointments ADD COLUMN reason TEXT");
     }
@@ -93,18 +102,36 @@ class DatabaseHelper {
           address TEXT,
           pickup_location TEXT,
           pickup_datetime TEXT,
-          status TEXT
+          status TEXT,
+          disease TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute("ALTER TABLE medication_orders ADD COLUMN disease TEXT");
+    }
+    if (oldVersion < 5) {
+      await db.execute('''
+        CREATE TABLE improvements(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          email TEXT,
+          message TEXT,
+          timestamp TEXT
         )
       ''');
     }
   }
 
+  // USER
   Future<int> registerUser(Map<String, dynamic> user) async {
     final db = await database;
     return await db.insert('users', user);
   }
 
-  Future<Map<String, dynamic>?> getUserByEmailAndPassword(String email, String password) async {
+  Future<Map<String, dynamic>?> getUserByEmailAndPassword(
+    String email,
+    String password,
+  ) async {
     final db = await database;
     final result = await db.query(
       'users',
@@ -124,12 +151,15 @@ class DatabaseHelper {
     return result.isNotEmpty ? result.first : null;
   }
 
+  // APPOINTMENT
   Future<int> insertAppointment(Map<String, dynamic> appointment) async {
     final db = await database;
     return await db.insert('appointments', appointment);
   }
 
-  Future<List<Map<String, dynamic>>> getAppointmentsForPatient(String email) async {
+  Future<List<Map<String, dynamic>>> getAppointmentsForPatient(
+    String email,
+  ) async {
     final db = await database;
     return await db.query(
       'appointments',
@@ -138,6 +168,7 @@ class DatabaseHelper {
     );
   }
 
+  // MEDICATION ORDER
   Future<int> insertMedicationOrder(Map<String, dynamic> order) async {
     final db = await database;
     return await db.insert('medication_orders', order);
@@ -157,8 +188,57 @@ class DatabaseHelper {
     );
   }
 
+  // NEW: Update status
+  Future<int> updateMedicationOrderStatus(
+    String orderId,
+    String newStatus,
+  ) async {
+    final db = await database;
+    return await db.update(
+      'medication_orders',
+      {'status': newStatus},
+      where: 'id = ?',
+      whereArgs: [orderId],
+    );
+  }
+
+  // NEW: Cancel an order
+  Future<int> cancelMedicationOrder(String orderId) async {
+    return await updateMedicationOrderStatus(orderId, 'cancelled');
+  }
+
+  // FEEDBACK
   Future<void> insertFeedback(Map<String, dynamic> feedback) async {
     final db = await database;
     await db.insert('feedback', feedback);
+  }
+
+  Future<Map<String, dynamic>?> getLatestFeedbackForUser(String email) async {
+    final db = await database;
+    final result = await db.query(
+      'feedback',
+      where: 'email = ?',
+      whereArgs: [email],
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  // IMPROVEMENTS
+  Future<void> insertImprovement(Map<String, dynamic> improvement) async {
+    final db = await database;
+    await db.insert('improvements', improvement);
+  }
+
+  // FIX UNKNOWN DISEASES → GENERAL
+  Future<void> fixUnknownDiseasesToGeneral() async {
+    final db = await database;
+    await db.update(
+      'medication_orders',
+      {'disease': 'General'},
+      where: 'disease = ?',
+      whereArgs: ['Unknown'],
+    );
   }
 }

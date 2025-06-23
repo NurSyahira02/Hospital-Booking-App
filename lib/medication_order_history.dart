@@ -7,10 +7,12 @@ class MedicationOrderHistoryPage extends StatefulWidget {
   const MedicationOrderHistoryPage({super.key, required this.email});
 
   @override
-  State<MedicationOrderHistoryPage> createState() => _MedicationOrderHistoryPageState();
+  State<MedicationOrderHistoryPage> createState() =>
+      _MedicationOrderHistoryPageState();
 }
 
-class _MedicationOrderHistoryPageState extends State<MedicationOrderHistoryPage> {
+class _MedicationOrderHistoryPageState
+    extends State<MedicationOrderHistoryPage> {
   List<MedicationOrder> _orders = [];
 
   @override
@@ -22,12 +24,13 @@ class _MedicationOrderHistoryPageState extends State<MedicationOrderHistoryPage>
   Future<void> _loadOrders() async {
     final allOrders = await DatabaseHelper().getAllMedicationOrders();
 
-    final filtered = allOrders
-        .map((map) => MedicationOrder.fromMap(map))
-        .where((order) => order.patientEmail == widget.email)
-        .toList();
+    final filtered =
+        allOrders
+            .map((map) => MedicationOrder.fromMap(map))
+            .where((order) => order.patientEmail == widget.email)
+            .toList();
 
-    // ✅ Sort: upcoming first
+    // Sort: upcoming first
     filtered.sort((a, b) => a.pickupDateTime.compareTo(b.pickupDateTime));
 
     setState(() => _orders = filtered);
@@ -41,32 +44,33 @@ class _MedicationOrderHistoryPageState extends State<MedicationOrderHistoryPage>
     _loadOrders();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Order deleted')));
     }
   }
 
   void _showDeleteConfirmation(MedicationOrder order) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Order'),
-        content: const Text('Are you sure you want to delete this order?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('No'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Cancel Order'),
+            content: const Text('Are you sure you want to delete this order?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('No'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _deleteOrder(order.id);
+                },
+                child: const Text('Yes'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteOrder(order.id);
-            },
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -74,28 +78,34 @@ class _MedicationOrderHistoryPageState extends State<MedicationOrderHistoryPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Medication Order History')),
-      body: _orders.isEmpty
-          ? const Center(child: Text('No orders found.'))
-          : ListView.builder(
-              itemCount: _orders.length,
-              itemBuilder: (context, index) {
-                final order = _orders[index];
-                final now = DateTime.now();
-                final isPast = order.pickupDateTime.isBefore(now);
+      body:
+          _orders.isEmpty
+              ? const Center(child: Text('No orders found.'))
+              : ListView.builder(
+                itemCount: _orders.length,
+                itemBuilder: (context, index) {
+                  final order = _orders[index];
+                  final now = DateTime.now();
+                  final isPast = order.pickupDateTime.isBefore(now);
 
-                return Card(
-                  color: isPast ? Colors.grey[200] : Colors.white,
-                  child: ListTile(
-                    title: Text('Medication: ${order.medications.join(', ')}'),
-                    subtitle: Text(
-                      'Pickup: ${order.pickupLocation} on ${order.pickupDateTime}\nStatus: ${order.status.name}',
+                  return Card(
+                    color: isPast ? Colors.grey[200] : Colors.white,
+                    child: ListTile(
+                      title: Text(
+                        'Medication: ${order.medications.join(', ')}',
+                      ),
+                      subtitle: Text(
+                        'Pickup: ${order.pickupLocation} on ${order.pickupDateTime}\nStatus: ${order.status.name}',
+                      ),
+                      trailing: Icon(isPast ? Icons.history : Icons.schedule),
+                      onLongPress:
+                          () => _showDeleteConfirmation(
+                            order,
+                          ), // long-press to delete
                     ),
-                    trailing: Icon(isPast ? Icons.history : Icons.schedule),
-                    onLongPress: () => _showDeleteConfirmation(order), // ✅ long-press to delete
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
     );
   }
 }

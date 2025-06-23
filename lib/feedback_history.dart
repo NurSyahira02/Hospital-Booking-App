@@ -20,7 +20,8 @@ class _FeedbackHistoryPageState extends State<FeedbackHistoryPage> {
   }
 
   Future<void> _loadFeedback() async {
-    final feedback = await FeedbackData.getAll();
+    final feedback =
+        await FeedbackData.getAll(); // You can replace this with actual DB call
     setState(() {
       _allFeedback = feedback;
       _filteredFeedback = feedback;
@@ -49,28 +50,57 @@ class _FeedbackHistoryPageState extends State<FeedbackHistoryPage> {
               decoration: InputDecoration(
                 labelText: 'Search by email or comment',
                 prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onChanged: _filterFeedback,
             ),
           ),
           Expanded(
-            child: _filteredFeedback.isEmpty
-                ? const Center(child: Text('No feedback found.'))
-                : ListView.builder(
-                    itemCount: _filteredFeedback.length,
-                    itemBuilder: (context, index) {
-                      final feedback = _filteredFeedback[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        child: ListTile(
-                          leading: const Icon(Icons.feedback, color: Colors.blue),
-                          title: Text(feedback.email),
-                          subtitle: Text('Rating: ${feedback.rating}\n"${feedback.comment}"'),
-                        ),
-                      );
-                    },
-                  ),
+            child:
+                _filteredFeedback.isEmpty
+                    ? const Center(child: Text('No feedback found.'))
+                    : ListView.builder(
+                      itemCount: _filteredFeedback.length,
+                      itemBuilder: (context, index) {
+                        final feedback = _filteredFeedback[index];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.feedback,
+                              color: Colors.blue,
+                            ),
+                            title: Text(
+                              feedback.email,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Rating: ${feedback.rating}',
+                                  style: const TextStyle(color: Colors.black87),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '"${feedback.comment}"',
+                                  style: const TextStyle(
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),

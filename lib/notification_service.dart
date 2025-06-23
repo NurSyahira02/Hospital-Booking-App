@@ -54,7 +54,7 @@ class NotificationService {
     );
   }
 
-  /// ✅ NEW: Manual reminder sent immediately or with short delay
+  /// NEW: Manual reminder sent immediately or with short delay
   static Future<void> sendManualReminder({
     required List<String> medications,
     required String location,
@@ -72,7 +72,7 @@ class NotificationService {
     );
   }
 
-  /// ✅ NEW: Courier delivery reminder
+  /// NEW: Courier delivery reminder
   static Future<void> scheduleCourierReminder({
     required List<String> medications,
     required String address,
@@ -85,7 +85,8 @@ class NotificationService {
     await _schedule(
       id: id,
       title: 'Courier Delivery Scheduled',
-      body: 'Your medications (${medications.join(', ')}) will be delivered to: $address',
+      body:
+          'Your medications (${medications.join(', ')}) will be delivered to: $address',
       dateTime: DateTime.now().add(const Duration(seconds: 5)),
     );
   }

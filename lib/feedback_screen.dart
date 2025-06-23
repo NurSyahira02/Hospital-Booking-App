@@ -26,7 +26,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
   Future<void> _loadProfileImage() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('profileImagePath');
+    final email = prefs.getString('loggedInEmail');
+    final path = prefs.getString('profileImagePath_$email');
     if (path != null && File(path).existsSync()) {
       setState(() => _profileImage = File(path));
     }
@@ -43,9 +44,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: _profileImage != null
-                  ? FileImage(_profileImage!)
-                  : const AssetImage('assets/default_avatar.png') as ImageProvider,
+              backgroundImage:
+                  _profileImage != null
+                      ? FileImage(_profileImage!)
+                      : const AssetImage('assets/default_avatar.png')
+                          as ImageProvider,
             ),
             const SizedBox(width: 10),
             Expanded(child: Text('${loc.sendFeedback}, $name')),
@@ -64,7 +67,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
               direction: Axis.horizontal,
               allowHalfRating: false,
               itemCount: 5,
-              itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
+              itemBuilder:
+                  (context, _) => const Icon(Icons.star, color: Colors.amber),
               onRatingUpdate: (rating) => setState(() => _rating = rating),
             ),
             const SizedBox(height: 24),
@@ -102,7 +106,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(loc.feedbackSubmitted)),
                   );
-                  Navigator.pop(context);
+                  Navigator.pop(
+                    context,
+                    true,
+                  ); 
                 }
               },
             ),

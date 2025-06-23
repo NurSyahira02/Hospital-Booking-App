@@ -2,9 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'database_helper.dart';
 import 'notification_service.dart';
+import 'home_page.dart';
 
 class BookAppointmentPage extends StatefulWidget {
   final Map<String, dynamic> userProfile;
@@ -36,14 +36,21 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
   Future<void> _loadProfileImage() async {
     final prefs = await SharedPreferences.getInstance();
-    final path = prefs.getString('profileImagePath');
+    final email = widget.userProfile['email'];
+    final path = prefs.getString('profileImagePath_$email');
     if (path != null && File(path).existsSync()) {
-      setState(() => _profileImage = File(path));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _profileImage = File(path));
+      });
     }
   }
 
   Future<void> _bookAppointment() async {
-    if (_selectedDate != null && _selectedTime != null && _selectedType != null) {
+    final loc = AppLocalizations.of(context)!;
+
+    if (_selectedDate != null &&
+        _selectedTime != null &&
+        _selectedType != null) {
       final appointmentDateTime = DateTime(
         _selectedDate!.year,
         _selectedDate!.month,
@@ -62,20 +69,25 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       await DatabaseHelper().insertAppointment(appointmentData);
 
       await NotificationService.scheduleAppointmentReminders(
-  doctorName: _selectedDoctor!,
-  appointmentDateTime: appointmentDateTime,
-);
+        doctorName: _selectedDoctor!,
+        appointmentDateTime: appointmentDateTime,
+      );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.appointmentBooked)),
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(loc.appointmentBooked)));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomePage(userProfile: widget.userProfile),
+          ),
         );
-        Navigator.pop(context);
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.pleaseCompleteAllFields)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.pleaseCompleteAllFields)));
     }
   }
 
@@ -90,9 +102,11 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: _profileImage != null
-                  ? FileImage(_profileImage!)
-                  : const AssetImage('assets/default_avatar.png') as ImageProvider,
+              backgroundImage:
+                  _profileImage != null
+                      ? FileImage(_profileImage!)
+                      : const AssetImage('assets/default_avatar.png')
+                          as ImageProvider,
             ),
             const SizedBox(width: 10),
             Expanded(child: Text('${loc.bookAppointment}, $name')),
@@ -105,10 +119,40 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           children: [
             DropdownButtonFormField<String>(
               value: _selectedType,
+              isDense: true,
               decoration: InputDecoration(labelText: loc.appointmentType),
-              items: _appointmentTypes.keys.map((type) {
-                return DropdownMenuItem(value: type, child: Text(type));
-              }).toList(),
+              items:
+                  _appointmentTypes.entries.map((entry) {
+                    final typeLabel = entry.key.split(' (')[0];
+                    final description =
+                        entry.key.contains('(')
+                            ? entry.key.split('(')[1].replaceAll(')', '')
+                            : '';
+
+                    return DropdownMenuItem(
+                      value: entry.key,
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '$typeLabel\n',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (description.isNotEmpty)
+                              TextSpan(
+                                text: description,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
               onChanged: (val) {
                 setState(() {
                   _selectedType = val;
@@ -118,13 +162,17 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
             ),
             const SizedBox(height: 16),
             if (_selectedDoctor != null)
-              Text('${loc.assignedDoctor}: $_selectedDoctor',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                '${loc.assignedDoctor}: $_selectedDoctor',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             const SizedBox(height: 16),
             ListTile(
-              title: Text(_selectedDate == null
-                  ? loc.selectDate
-                  : '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'),
+              title: Text(
+                _selectedDate == null
+                    ? loc.selectDate
+                    : '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}',
+              ),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
                 final picked = await showDatePicker(
@@ -133,24 +181,22 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                   firstDate: DateTime.now(),
                   lastDate: DateTime(2100),
                 );
-                if (picked != null) {
-                  setState(() => _selectedDate = picked);
-                }
+                if (picked != null) setState(() => _selectedDate = picked);
               },
             ),
             ListTile(
-              title: Text(_selectedTime == null
-                  ? loc.selectTime
-                  : _selectedTime!.format(context)),
+              title: Text(
+                _selectedTime == null
+                    ? loc.selectTime
+                    : _selectedTime!.format(context),
+              ),
               trailing: const Icon(Icons.access_time),
               onTap: () async {
                 final picked = await showTimePicker(
                   context: context,
                   initialTime: TimeOfDay.now(),
                 );
-                if (picked != null) {
-                  setState(() => _selectedTime = picked);
-                }
+                if (picked != null) setState(() => _selectedTime = picked);
               },
             ),
             const SizedBox(height: 24),
